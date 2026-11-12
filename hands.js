@@ -33,7 +33,6 @@ const GRAB_SETTLE_MS = 300;
 // Landmark indices (MediaPipe hand model).
 const WRIST = 0, THUMB_TIP = 4, INDEX_MCP = 5, INDEX_TIP = 8, MIDDLE_MCP = 9;
 const KNUCKLES = [5, 9, 13, 17];
-const OTHER_FINGERS = [[12, 10], [16, 14], [20, 18]]; // middle, ring, pinky: [tip, pip]
 
 // 3D distance: depth stops a sideways-turned hand from looking pinched in the 2D image.
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
@@ -76,19 +75,16 @@ function toSquare(lm, aspect) {
   return lm.map((p) => ({ x: p.x * aspect, y: p.y, z: p.z * aspect }));
 }
 
-const extendedCount = (lm) =>
-  OTHER_FINGERS.filter(([tip, pip]) => dist(lm[tip], lm[WRIST]) > dist(lm[pip], lm[WRIST]) * 1.05).length;
-
-// A pinch, not a fist: thumb and index tips touch, the index finger reaches out rather
-// than curling into the palm, and at least two of the other fingers are not curled.
+// A pinch, not a fist: thumb and index tips touch and the index finger reaches out rather
+// than curling into the palm. The other three fingers can do anything: most people curl
+// them when they pinch, some hold them out like an "OK" sign; both count.
 function pinchState(lm) {
   const size = dist(lm[WRIST], lm[MIDDLE_MCP]);
   const gap = dist(lm[THUMB_TIP], lm[INDEX_TIP]) / size;
   const indexOut = dist(lm[INDEX_TIP], lm[WRIST]) > dist(lm[INDEX_MCP], lm[WRIST]) * 1.1;
-  const others = extendedCount(lm);
   return {
-    pinched: gap < PINCH_ON && indexOut && others >= 2,
-    released: gap > PINCH_OFF || others === 0, // fingers opened, or the hand closed into a fist
+    pinched: gap < PINCH_ON && indexOut,
+    released: gap > PINCH_OFF || !indexOut, // fingers opened, or the hand closed into a fist
   };
 }
 
