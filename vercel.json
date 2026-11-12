@@ -1,12 +1,32 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/extract.py": { "maxDuration": 60 }
+    "api/extract.py": {
+      "maxDuration": 60
+    }
   },
   "headers": [
     {
       "source": "/api/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "astrolabe.utsavkumar.dev"
+        }
+      ],
+      "destination": "https://astrolabe.utsavkumar.com/$1",
+      "permanent": true
     }
   ]
 }
