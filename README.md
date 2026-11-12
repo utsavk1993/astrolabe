@@ -6,6 +6,10 @@
 
 <p align="center"><b>One dial, eight cities, every time zone at a glance.</b></p>
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Astrolabe demo: the feature guide, reading a dropped meeting invite, stepping between the times found, and finding a meeting slot for New York and London" width="880">
+</p>
+
 Astrolabe is a world clock built as a set of rotating rings. Each ring is a city turned to its own local time, so reading straight down the red line at the top gives you the time everywhere at once. On top of that it has three AI features: turn the dial with your hand through the webcam, drop in a screenshot to jump to the times inside it, and ask for a meeting slot across cities in plain English.
 
 It's plain HTML, CSS and JavaScript with no framework and no build step, plus a tiny Python server for the AI.
@@ -153,6 +157,7 @@ astrolabe/
 ├── tour.js             The "What can it do?" pop-up
 ├── server.py           Local server and the bridge to NVIDIA's API
 ├── sample-invite.png   Sample screenshot used by the guide
+├── assets/demo.gif     The demo at the top of this README
 ├── favicon.svg         A miniature of the dial
 └── .env.example        Template for your API key
 ```
