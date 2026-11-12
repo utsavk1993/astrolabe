@@ -24,7 +24,7 @@ It's plain HTML, CSS and JavaScript with no framework and no build step, plus a 
 Eight concentric rings (Vancouver, New York, London, Dubai, Kolkata, Singapore, Tokyo and Sydney), each rotated to its local time. Light sections are daytime, dark sections are night. The **World time** card beside the dial lists the same times in words, with the date and how far ahead or behind each city is.
 
 ### ✋ Turn the dial with your hand · *AI, on-device*
-Switch on the camera, then **pinch** your thumb and index finger to grab the dial, **twist** your hand to move through time, and **let go** to leave it there. Hand tracking runs entirely in the browser, so no video ever leaves your computer.
+Switch on the camera, then **pinch** your thumb and index finger to grab the dial, move your hand round in a **circle** to turn it through time, like dragging the rim of a wheel, and **let go** to leave it there. Hand tracking runs entirely in the browser, so no video ever leaves your computer.
 
 ### 📸 Drop anything with a time in it · *AI*
 Drag in a screenshot of a meeting invite, flight confirmation or chat message, paste one with ⌘V, drop a text or calendar (`.ics`) file, or just type *"standup at 9:30 IST tomorrow"*. AI reads the dates, times and time zones, and the dial turns to each one it finds. A preview of what you dropped appears in the tools card, and you can step through several times with ‹ › or the ← → keys.
@@ -121,8 +121,8 @@ While the dial is moving, the small :30 marks fade out. Many fine marks on conce
 ### ✋ Hand control
 1. **Finding the hand.** Google's MediaPipe Hand Landmarker, a small machine-learning model, runs in the browser on your graphics chip. For every camera frame it returns 21 points: the wrist, each knuckle and each fingertip.
 2. **Detecting a pinch.** A pinch counts only when the thumb and index fingertips are close together in 3D, the index finger is extended, and at least two other fingers are open. It must also hold for a short moment. These rules stop a fist, or just a turned hand, from grabbing the dial by accident.
-3. **Measuring the twist.** The angle of a line from the wrist to the middle of the knuckles gives the hand's rotation. Turning your hand changes that angle, and the change becomes time: twisting further moves the dial further.
-4. **Keeping it steady.** Raw hand positions shake slightly. A **One Euro filter** smooths small jitter while still following fast, deliberate movement. The dial also snaps to **5-minute steps**, with a little resistance at each one, so it settles cleanly instead of trembling.
+3. **Measuring the turn.** The point between your thumb and index fingertip is tracked as you circle your pinched hand. The circle can be any size and anywhere in view, even low down near your lap: its centre is estimated as you go, as a lagging average of where the pinch has been. The direction from that centre to your fingers turns exactly as fast as your hand goes round, and the dial turns by the same amount: one full circle of the hand is one full turn of the dial, 24 hours, and you can keep going. When the hand stops, the average catches up and the dial stays still. (A wrist twist was tried first, but a wrist only rolls about 90°, so it could never reach a full turn.)
+4. **Keeping it steady.** Raw hand positions shake slightly. A **One Euro filter** smooths small jitter while still following fast, deliberate movement. The dial also snaps to **15-minute steps**, with a little resistance at each one, so it settles cleanly instead of trembling.
 5. **Letting go.** Opening the pinch releases the dial where it is. A short delay ignores the tiny movement your hand makes while releasing.
 
 ### 📸 Reading times from screenshots and text

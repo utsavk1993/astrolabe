@@ -243,7 +243,7 @@ body.travelling .side-time { color: var(--accent); }
 /* Camera preview on the left, status and tips beside it, so the card stays short. */
 .hands-panel:not([hidden]) {
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: 200px 1fr;
   grid-template-rows: auto 1fr;
   column-gap: 12px;
   align-items: start;
@@ -252,8 +252,8 @@ body.travelling .side-time { color: var(--accent); }
 .hands-preview {
   grid-row: 1 / span 2;
   display: block;
-  width: 120px;
-  height: 90px;
+  width: 200px;
+  height: auto;
   border-radius: 8px;
   background: #000;
 }

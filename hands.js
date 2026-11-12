@@ -1,6 +1,6 @@
 // Hand control: turn the dial with your hand through the webcam.
-//   Pinch (thumb + index) to grab the dial, twist your hand like a knob to turn it,
-//   let go to leave it there. Only a real pinch moves it: fists and open hands do nothing.
+//   Pinch (thumb + index) to grab the dial, move the pinched hand round in a circle to
+//   turn it (like dragging the rim of a wheel), let go to leave it there. Only a real pinch moves it: fists and open hands do nothing.
 //   "Back to now" (button or Esc) returns to the present.
 // Runs entirely in the browser (MediaPipe Hand Landmarker); no frames leave the machine.
 // Desktop/laptop only: on touch-first devices this file does nothing at all.
@@ -15,36 +15,51 @@ const MP_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSIO
 const MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
-// Dial degrees per degree of hand twist. The dial is 15°/hour, so a 90° wrist turn ≈ 12 h.
-const GAIN = 2;
+// Dial degrees per degree the pinch travels round its circle: one full circle of the hand
+// turns the dial once (24 h), and you can keep circling. (Twisting the wrist was tried
+// first, but a wrist only rolls ~90°, so it could never reach a full turn.)
+const GAIN = 1;
+// The circle can be anywhere in view, any size: its centre is found as you go, as a
+// lagging average of where the pinch has been. Moving round a circle, the pinch stays ahead
+// of that average and the direction between them turns exactly as fast as the hand does.
+// When the hand stops, the average catches up and nothing moves.
+const CENTRE_LAG_S = 0.8;
+// Closer than this to the centre the angle swings wildly, so it is ignored.
+const MIN_RADIUS = 0.035; // fraction of the frame height
+// The pinch must travel this far before its angle is read again, so fingertip shake on a
+// still hand adds up to nothing.
+const MOVE_DEADBAND = 0.01; // fraction of the frame height (about 7 px at 720p)
 const MS_PER_DIAL_DEG = 3600000 / 15;
 const PINCH_ON = 0.32;   // thumb–index gap as a fraction of hand size
 const PINCH_OFF = 0.48;  // hysteresis so a wobbly pinch doesn't drop the dial
 // A pinch must hold this long before it grabs, so passing gestures (closing into a fist,
 // waving, turning the hand) don't catch the dial on the way through.
 const PINCH_CONFIRM_MS = 120;
-// The dial clicks in 5-minute steps like a detented knob. It only moves to the next
+// The dial clicks in 15-minute steps like a detented knob (3.75° of circling each). It only moves to the next
 // step once the hand has clearly gone past it, so tremor smaller than that is ignored.
-const DETENT_MS = 5 * 60000;
+const DETENT_MS = 15 * 60000;
 const DETENT_HYSTERESIS = 1; // steps to travel past the current one before clicking over
+// A hand that slips out of view for a moment keeps hold of the dial for this long.
+const LOST_GRACE_MS = 500;
 // Pinching jolts the hand; hold the dial still briefly after grabbing while the filter settles.
 const GRAB_SETTLE_MS = 300;
 
 // Landmark indices (MediaPipe hand model).
 const WRIST = 0, THUMB_TIP = 4, INDEX_MCP = 5, INDEX_TIP = 8, MIDDLE_MCP = 9;
-const KNUCKLES = [5, 9, 13, 17];
 
 // 3D distance: depth stops a sideways-turned hand from looking pinched in the 2D image.
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 const wrapDeg = (d) => ((d + 540) % 360) - 180;
 
-// Hand roll, clockwise from straight up, as the user sees it (camera image is mirrored).
-// Measured wrist → average of the four knuckles: averaging points cancels a lot of noise.
-function handAngle(lm) {
-  const kx = KNUCKLES.reduce((s, i) => s + lm[i].x, 0) / KNUCKLES.length;
-  const ky = KNUCKLES.reduce((s, i) => s + lm[i].y, 0) / KNUCKLES.length;
-  const dx = -(kx - lm[WRIST].x);
-  const dy = ky - lm[WRIST].y;
+// Where the pinch is: midway between the thumb and index fingertips.
+const pinchPoint = (lm) => ({ x: (lm[THUMB_TIP].x + lm[INDEX_TIP].x) / 2, y: (lm[THUMB_TIP].y + lm[INDEX_TIP].y) / 2 });
+
+// Angle of point p around centre c, clockwise from straight up, as the user sees it (the
+// camera image is mirrored). null when too near the centre to be stable.
+function angleAround(p, c) {
+  const dx = -(p.x - c.x);
+  const dy = p.y - c.y;
+  if (Math.hypot(dx, dy) < MIN_RADIUS) return null;
   return (Math.atan2(dx, -dy) * 180) / Math.PI;
 }
 
@@ -98,11 +113,11 @@ function setup() {
       <span class="hands-icon" aria-hidden="true">✋</span><span class="hands-label">Hand control</span>
     </button>
     <div class="hands-panel" hidden>
-      <canvas class="hands-preview" width="240" height="180" aria-hidden="true"></canvas>
+      <canvas class="hands-preview" width="320" height="180" aria-hidden="true"></canvas>
       <p class="hands-status">Starting camera…</p>
       <ul class="hands-help">
         <li><b>Pinch</b> to grab</li>
-        <li><b>Twist</b> to turn</li>
+        <li><b>Circle</b> your hand to turn, anywhere in view</li>
         <li><b>Let go</b> to leave it</li>
       </ul>
     </div>`;
@@ -119,9 +134,12 @@ function setup() {
   const ctx = canvas.getContext("2d");
 
   let landmarker = null, video = null, stream = null, running = false;
-  let grabbing = false, pinchSince = 0;
+  let grabbing = false, pinchSince = 0, lostSince = 0;
   // While grabbed: continuous angle (unwrapped), its filtered value, and offsets.
-  let unwrapped = 0, lastRaw = 0, grabAngle = 0, grabOffset = 0, detent = 0, grabbedAt = 0;
+  // centre: the circle's estimated middle, in square-scaled coordinates (see toSquare).
+  let centre = null, centreT = 0, aspect = 16 / 9;
+  // anchor: where the pinch was when its angle was last read.
+  let unwrapped = 0, anchor = null, grabAngle = 0, grabOffset = 0, detent = 0, grabbedAt = 0;
   const smoother = new OneEuro();
   // Recent dial positions, so letting go can undo the twitch that opening the fingers causes.
   let history = [];
@@ -149,13 +167,19 @@ function setup() {
       }
       if (!running) return;
       status.textContent = "Waiting for camera permission…";
-      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+      // Widescreen: most laptop cameras are 16:9, and asking for 4:3 makes the browser crop
+      // the sides off, so the hand leaves the view sooner when circling.
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 }, facingMode: "user" },
+      });
       if (!running) return stopStream();
       video = document.createElement("video");
       video.srcObject = stream;
       video.muted = true;
       video.playsInline = true;
       await video.play();
+      // Match the preview's shape to what the camera actually gave.
+      canvas.height = Math.round(canvas.width / ((video.videoWidth / video.videoHeight) || 16 / 9));
       status.textContent = "Show your hand";
       loop();
     } catch (err) {
@@ -200,14 +224,29 @@ function setup() {
 
   function handle(lm) {
     if (!lm) {
-      setGrab(false);
       pinchSince = 0;
+      anchor = null; // when the hand comes back, carry on from there without a jump
+      if (grabbing) {
+        lostSince ||= performance.now();
+        if (performance.now() - lostSince < LOST_GRACE_MS) return;
+      }
+      setGrab(false);
+      lostSince = 0;
       status.textContent = "Show your hand";
       return;
     }
-    lm = toSquare(lm, video.videoWidth / video.videoHeight || 4 / 3);
+    lostSince = 0;
+    aspect = video.videoWidth / video.videoHeight || 16 / 9;
+    lm = toSquare(lm, aspect);
     const { pinched, released } = pinchState(lm);
-    const angle = handAngle(lm);
+    const p = pinchPoint(lm);
+    const now0 = performance.now();
+    // Each grab starts a new circle wherever the hand is.
+    if (!grabbing) { centre = { ...p }; centreT = now0; }
+    const k = 1 - Math.exp(-(now0 - centreT) / 1000 / CENTRE_LAG_S);
+    centre.x += (p.x - centre.x) * k;
+    centre.y += (p.y - centre.y) * k;
+    centreT = now0;
 
     // Debounce: only a pinch held for PINCH_CONFIRM_MS counts.
     pinchSince = pinched ? pinchSince || performance.now() : 0;
@@ -215,7 +254,8 @@ function setup() {
 
     if (!grabbing && confirmed) {
       setGrab(true);
-      unwrapped = lastRaw = angle;
+      unwrapped = 0;
+      anchor = { ...p };
       smoother.reset();
       grabbedAt = performance.now();
       grabAngle = smoother.filter(unwrapped, grabbedAt);
@@ -229,11 +269,18 @@ function setup() {
     }
 
     if (grabbing) {
-      unwrapped += wrapDeg(angle - lastRaw); // follow past ±180° without a jump
-      lastRaw = angle;
+      // Add how far the pinch has gone round since the anchor, once it has really moved.
+      // wrapDeg follows past ±180° without a jump. Near the centre the angle is unreliable,
+      // so movement there is skipped.
+      if (!anchor) anchor = { ...p };
+      else if (Math.hypot(p.x - anchor.x, p.y - anchor.y) > MOVE_DEADBAND) {
+        const a0 = angleAround(anchor, centre), a1 = angleAround(p, centre);
+        if (a0 !== null && a1 !== null) unwrapped += wrapDeg(a1 - a0);
+        anchor = { ...p };
+      }
       const smooth = smoother.filter(unwrapped, performance.now());
       if (performance.now() - grabbedAt < GRAB_SETTLE_MS) grabAngle = smooth; // re-anchor while settling
-      // Dial follows the hand: clockwise twist turns the rings clockwise (back in time).
+      // Dial follows the hand: circling clockwise turns the rings clockwise (back in time).
       const raw = grabOffset - (smooth - grabAngle) * GAIN * MS_PER_DIAL_DEG;
       if (Math.abs(raw - detent) > DETENT_MS * DETENT_HYSTERESIS) {
         detent = Math.round(raw / DETENT_MS) * DETENT_MS;
@@ -262,6 +309,27 @@ function setup() {
     ctx.drawImage(video, 0, 0, w, h);
     ctx.restore();
     if (!lm) return;
+    if (grabbing) {
+      // The pinch, the circle's estimated centre, and a line between them that turns as you circle.
+      const p = pinchPoint(lm);
+      const px = (1 - p.x) * w, py = p.y * h;
+      const cx = (1 - centre.x / aspect) * w, cy = centre.y * h;
+      ctx.strokeStyle = "#e53935";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#e53935";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = grabbing ? "#e53935" : "#f4e7c6";
     for (const p of lm) {
       ctx.beginPath();
