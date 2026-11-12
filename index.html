@@ -16,12 +16,19 @@
     </svg>
     <h1>Astrolabe needs a bigger screen</h1>
     <p>It's built for laptops and desktops. Open it on one, or make this window wider.</p>
+    <a class="back-link" href="https://utsavkumar.com">← Back to utsavkumar.com</a>
   </div>
   <div class="drop-overlay" hidden><span>Drop to turn the dial</span></div>
   <main class="wall">
     <svg id="clock" viewBox="-530 -530 1060 1060" role="img"
          aria-label="World clock with rotating time zone rings"></svg>
     <div class="side-col">
+    <nav class="topbar" aria-label="Site">
+      <a class="back-link" href="https://utsavkumar.com">← utsavkumar.com</a>
+      <button class="tour-open" type="button" aria-haspopup="dialog">
+        <span aria-hidden="true">✦</span> What can it do?
+      </button>
+    </nav>
     <aside class="side" aria-label="Time in each city">
       <header class="side-head">
         <h1 class="side-title">World time</h1>
@@ -70,9 +77,6 @@
     </div>
   </main>
 
-  <button class="tour-open" type="button" aria-haspopup="dialog">
-    <span aria-hidden="true">✦</span> What can it do?
-  </button>
   <dialog class="tour" aria-labelledby="tour-title">
     <header class="tour-head">
       <h2 id="tour-title" tabindex="-1" autofocus>What Astrolabe can do</h2>
