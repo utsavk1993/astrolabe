@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astrolabe</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="small-screen" role="alert">
+    <svg viewBox="-50 -50 100 100" aria-hidden="true">
+      <circle r="44" fill="none" stroke="currentColor" stroke-width="5"/>
+      <circle r="30" fill="none" stroke="currentColor" stroke-width="3" opacity="0.5"/>
+      <line x1="0" y1="-44" x2="0" y2="-12" stroke="#e53935" stroke-width="4"/>
+    </svg>
+    <h1>Astrolabe needs a bigger screen</h1>
+    <p>It's built for laptops and desktops. Open it on one, or make this window wider.</p>
+  </div>
+  <div class="drop-overlay" hidden><span>Drop to turn the dial</span></div>
+  <main class="wall">
+    <svg id="clock" viewBox="-530 -530 1060 1060" role="img"
+         aria-label="World clock with rotating time zone rings"></svg>
+    <div class="side-col">
+    <aside class="side" aria-label="Time in each city">
+      <header class="side-head">
+        <h1 class="side-title">World time</h1>
+        <span class="side-state" aria-live="polite"><span class="side-dot" aria-hidden="true"></span><span class="side-state-text">Live</span></span>
+      </header>
+      <ol class="side-list"></ol>
+    </aside>
+    <section class="side side-tools" aria-label="Tools">
+        <form class="ask" autocomplete="off">
+          <label class="ask-label" for="ask-input">Drop a screenshot, paste, or type a time</label>
+          <div class="ask-row">
+            <span class="ask-field">
+              <input id="ask-input" class="ask-input" type="text" placeholder="A time, or a meeting to plan…">
+              <button class="ask-clear" type="button" aria-label="Clear" hidden>×</button>
+            </span>
+            <button class="ask-go" type="submit">Read</button>
+          </div>
+          <p class="ask-status" role="status"></p>
+        </form>
+        <button class="side-now" type="button" hidden>Back to now</button>
+        <section class="preview" hidden aria-live="polite">
+          <img class="preview-img" alt="The dropped image" hidden>
+          <pre class="preview-text" hidden></pre>
+          <div class="found" hidden>
+            <div class="found-top">
+              <span class="found-label"></span>
+              <span class="found-nav" hidden>
+                <button class="found-prev" type="button" aria-label="Previous time">‹</button>
+                <span class="found-count"></span>
+                <button class="found-next" type="button" aria-label="Next time">›</button>
+              </span>
+            </div>
+            <div class="found-source"></div>
+          </div>
+        </section>
+        <section class="meeting" hidden aria-live="polite">
+          <div class="meeting-top">
+            <span class="meeting-label"></span>
+            <button class="meeting-close" type="button" aria-label="Clear the meeting and go back to now">×</button>
+          </div>
+          <div class="meeting-when"></div>
+          <p class="meeting-note"></p>
+          <ul class="meeting-people"></ul>
+        </section>
+    </section>
+    </div>
+  </main>
+
+  <button class="tour-open" type="button" aria-haspopup="dialog">
+    <span aria-hidden="true">✦</span> What can it do?
+  </button>
+  <dialog class="tour" aria-labelledby="tour-title">
+    <header class="tour-head">
+      <h2 id="tour-title" tabindex="-1" autofocus>What Astrolabe can do</h2>
+      <button class="tour-close" type="button" aria-label="Close">×</button>
+    </header>
+    <p class="tour-intro">Astrolabe shows the time in eight cities on a single dial. Here is everything it can do, with a way to try each feature right away.</p>
+    <ol class="tour-list">
+      <li>
+        <h3>Read every city at a glance</h3>
+        <p>Each coloured ring is a city, turned to its own local time. Read straight down the <b class="red">red line</b> at the top to see the current time everywhere at once. Light sections are daytime and dark sections are night. The World time card lists the same times in words, with how far ahead or behind each city is.</p>
+      </li>
+      <li>
+        <h3>Turn the dial with your hand <span class="tag">AI · on-device</span></h3>
+        <p>Turn on the camera, then <b>pinch</b> your thumb and index finger to grab the dial, <b>twist</b> your hand to move through time, and <b>let go</b> to leave it there. Hand tracking runs entirely in your browser, so no video ever leaves your computer.</p>
+        <button class="tour-try" data-try="hands" type="button">Turn on the camera</button>
+      </li>
+      <li>
+        <h3>Drop anything with a time in it <span class="tag">AI</span></h3>
+        <p>Drag in a screenshot of a meeting invite, a flight confirmation or a chat, paste one with <kbd>⌘</kbd> <kbd>V</kbd>, or type a sentence such as <i>“standup at 9:30 IST tomorrow”</i>. AI reads the dates, times and time zones, and the dial turns to each one it finds.</p>
+        <div class="tour-row">
+          <button class="tour-try" data-try="image" type="button">Try a sample invite</button>
+          <button class="tour-try" data-try="text" type="button">Try a sample message</button>
+        </div>
+      </li>
+      <li>
+        <h3>Find a meeting time across cities <span class="tag">AI</span></h3>
+        <p>Ask for a meeting in plain words, for example <i>“a one-hour call with New York and London next week”</i>. Astrolabe finds the first slot when everyone, including you, is within working hours (9 AM to 5 PM on a weekday). The dial lights up those cities' working hours and marks the overlap with a red wedge.</p>
+        <button class="tour-try" data-try="meeting" type="button">Find a sample meeting</button>
+      </li>
+      <li>
+        <h3>Move around</h3>
+        <p>When several times are found, step through them with <kbd>←</kbd> and <kbd>→</kbd>. Press <kbd>Esc</kbd> or <b>Back to now</b> at any point to return to the live time.</p>
+      </li>
+    </ol>
+  </dialog>
+  <script src="clock.js"></script>
+  <script src="hands.js"></script>
+  <script src="meeting.js"></script>
+  <script src="drop.js"></script>
+  <script src="tour.js"></script>
+</body>
+</html>
