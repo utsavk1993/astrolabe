@@ -1,6 +1,10 @@
-# 🧭 Astrolabe
+<p align="center">
+  <img src="favicon.svg" alt="Astrolabe logo" width="120" height="120">
+</p>
 
-**One dial, eight cities, every time zone at a glance.**
+<h1 align="center">Astrolabe</h1>
+
+<p align="center"><b>One dial, eight cities, every time zone at a glance.</b></p>
 
 Astrolabe is a world clock built as a set of rotating rings. Each ring is a city turned to its own local time, so reading straight down the red line at the top gives you the time everywhere at once. On top of that it has three AI features: turn the dial with your hand through the webcam, drop in a screenshot to jump to the times inside it, and ask for a meeting slot across cities in plain English.
 
@@ -40,7 +44,7 @@ cd astrolabe
 
 # 2. Add your free NVIDIA API key (only needed for the AI reading and meeting features)
 cp .env.example .env
-#    then open .env and paste your key after NVIDIA_API_KEY=
+# then open .env and paste your key after NVIDIA_API_KEY=
 
 # 3. Start the server
 python3 server.py
@@ -94,7 +98,7 @@ The dial, the World time card and hand control all work without a key. Only read
 
 ---
 
-## 🔍 How it works (in plain English)
+## 🔍 How it works
 
 ### 🕰️ The dial
 Each ring is drawn once as an SVG circle with 24 hours around it. To show a city's time, the whole ring is simply **rotated** so the current hour sits under the red line at the top. One full turn is 24 hours, so an hour is 15 degrees. The browser's time zone database gives the exact local time for each city, including daylight saving, so every ring is always correct relative to the others.
@@ -155,7 +159,7 @@ astrolabe/
 
 ---
 
-## 🎨 Customising
+## 🎨 Customizing
 
 - **Change the cities:** edit the `ZONES` list at the top of `clock.js`. Each entry is a name, an IANA time zone (for example `Europe/Berlin`) and a colour. Around eight rings is the practical limit before the inner labels run out of room.
 - **Change working hours:** edit `WORK` and `STRETCH` at the top of `meeting.js`, and `WORK_START` / `WORK_END` in `clock.js` for the arcs on the dial.
