@@ -82,6 +82,7 @@ The dial, the World time card and hand control all work without a key. Only read
 | `MAX_CONCURRENT` | AI requests handled at the same time (default `3`). |
 | `TRUST_PROXY` | Set to `1` behind a cloud load balancer so each visitor is identified by their real address. |
 | `ALLOWED_ORIGINS` | Comma-separated sites allowed to use the AI endpoint, e.g. `https://astrolabe.example.com`. Default: only the site itself. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | A Redis store for the rate-limit counters (set automatically by Vercel's Upstash integration). Without them, counts are kept in memory. |
 
 ---
 
@@ -96,7 +97,10 @@ The dial, the World time card and hand control all work without a key. Only read
 | 📷 Camera | **`getUserMedia`** (WebRTC) | Webcam access for hand control. |
 | 〰️ Smoothing | **One Euro filter** | Removing hand jitter without adding lag. |
 | 🧠 Language and vision AI | **NVIDIA Nemotron 3.5 Super VL** via the **NVIDIA API catalogue** (free tier, OpenAI-compatible API) | Reading times from screenshots and text, and understanding meeting requests. |
-| 🐍 Backend | **Python 3 standard library** (`http.server`, `urllib`) | Serving the site and passing requests to NVIDIA while keeping the key secret. |
+| 🐍 Backend | **Python 3 standard library** (`http.server`, `urllib`) | The AI endpoint: passing requests to NVIDIA while keeping the key secret. One shared module runs both locally and on Vercel. |
+| ☁️ Hosting | **Vercel** (static files + Python serverless functions) | Serving the site and the AI endpoint in production. |
+| 🧮 Rate limiting | **Upstash Redis** (REST API) | Shared request counters, so limits hold across every copy of the serverless function. |
+| ✅ Checks | **GitHub Actions** + Python `unittest` | Checking every push: JavaScript parses, Python compiles, and the API logic behaves. |
 | 🖼️ Image prep | **Canvas API** | Shrinking screenshots before upload. |
 | 💬 Pop-up | **HTML `<dialog>`** | The "What can it do?" guide, with built-in focus handling and Esc to close. |
 
@@ -122,7 +126,7 @@ While the dial is moving, the small :30 marks fade out. Many fine marks on conce
 5. **Letting go.** Opening the pinch releases the dial where it is. A short delay ignores the tiny movement your hand makes while releasing.
 
 ### 📸 Reading times from screenshots and text
-1. The browser shrinks the image and sends it, or the text, to the local Python server.
+1. The browser shrinks the image and sends it, or the text, to the server (the local Python server, or a Vercel function in production).
 2. The server forwards it to **NVIDIA's Nemotron vision-language model** with instructions to reply only with structured JSON: a short label, the date and time exactly as written, and the time zone.
 3. The AI only *reads*. All the time zone maths happens in the browser: it converts "10:00 AM in Los Angeles on Thursday" into an exact moment, handling daylight saving, and turns the dial to it.
 4. Common abbreviations like PT, ET, IST and JST are also mapped to time zones in code, as a safety net in case the model guesses wrong.
@@ -140,7 +144,9 @@ The AI's only job is to **understand the request**: which cities, which day to s
 Splitting the work this way keeps the AI's part small and easy to check, and makes the scheduling itself exact and repeatable.
 
 ### 🐍 Why there's a server at all
-Browsers block web pages from calling NVIDIA's API directly, and an API key placed in page code would be visible to anyone. The small Python server solves both problems: the page talks to `localhost`, and the server adds the key and forwards the request. It serves only the site's own files (never `.env`), and only accepts connections from your own machine.
+Browsers block web pages from calling NVIDIA's API directly, and an API key placed in page code would be visible to anyone. A small server solves both problems: the page talks to its own site, and the server adds the key and forwards the request.
+
+The same Python code runs in two places. On your machine, `server.py` serves the site and the API. On Vercel, the site is served as static files and the two API routes run as **serverless functions**: small pieces of code that start on demand for each request. Both use one shared module, `api/_core.py`, so they behave identically.
 
 ---
 
@@ -149,13 +155,20 @@ Browsers block web pages from calling NVIDIA's API directly, and an API key plac
 ```
 astrolabe/
 ├── index.html          Page structure: dial, World time card, tools card, guide pop-up
-├── styles.css          All styling, the three-column layout and the small-screen message
+├── styles.css          All styling, the layout and the small-screen message
 ├── clock.js            The dial: drawing, time zone maths, gliding, the World time card
 ├── hands.js            Hand control: camera, MediaPipe, pinch detection, smoothing
 ├── drop.js             Dropping, pasting and typing: previews, reading, stepping through times
 ├── meeting.js          Meeting finder: slot search and the meeting card
 ├── tour.js             The "What can it do?" pop-up
-├── server.py           Local server and the bridge to NVIDIA's API
+├── server.py           Local server: serves the site and the API on your machine
+├── api/
+│   ├── _core.py        The API logic: prompt, NVIDIA call, reply checks, rate limits
+│   ├── extract.py      Vercel function for POST /api/extract
+│   └── health.py       Vercel function for GET /api/health
+├── tests/test_core.py  Checks for the API logic
+├── .github/workflows/  The GitHub Actions check that runs on every push
+├── vercel.json         Vercel settings (function time limit, no caching for the API)
 ├── sample-invite.png   Sample screenshot used by the guide
 ├── assets/demo.gif     The demo at the top of this README
 ├── favicon.svg         A miniature of the dial
@@ -171,33 +184,32 @@ astrolabe/
 
 ---
 
-## 🌐 Deploying
+## 🌐 Deploying to Vercel
 
-`server.py` runs as-is on any host that can run a Python process, such as **Render**, **Railway** or **Fly.io**. There's nothing to install.
+Vercel serves the site's files directly and runs `api/extract.py` and `api/health.py` as Python serverless functions. There's no build step and nothing to install.
 
-1. Create a web service from this repository with the start command `python3 server.py`.
-2. Add these environment variables in the host's dashboard (never commit them):
-   - `NVIDIA_API_KEY`: your key
-   - `HOST=0.0.0.0`
-   - `TRUST_PROXY=1`
-3. The host provides `PORT` automatically.
+1. **Import the project.** On [vercel.com](https://vercel.com), choose **Add New → Project**, import this GitHub repository, and keep the framework preset as **Other**. Leave the build and output settings empty.
+2. **Add your key.** Under **Environment Variables**, add `NVIDIA_API_KEY` with your key, then deploy.
+3. **Add shared rate limits.** In the project, open **Storage** (or the **Marketplace**), add **Upstash for Redis** on the free plan, and connect it to the project. This adds the Redis connection details as environment variables automatically. Redeploy so the functions pick them up.
+4. **Check it.** Open `https://<your-project>.vercel.app/api/health`. It should show `"configured": true`. Then try **✦ What can it do? → Try a sample message** on the site.
 
-A purely static host such as GitHub Pages can serve the dial and hand control, but not the AI features, because those need the server to keep the key secret.
+From then on, every push to `main` deploys automatically, and every pull request gets its own preview link.
+
+> 💡 Without step 3 the site still works, but each copy of the function keeps its own counts, so the limits are much looser.
 
 ---
 
 ## 🛡️ Protecting the free API quota
 
-A public demo with a free API key needs guard rails, or one visitor (or one script) could use up the whole quota. The server has four built in, all adjustable in the settings above:
+A public demo with a free API key needs guard rails, or one visitor (or one script) could use up the whole quota. Four are built in, all adjustable with the settings above:
 
 1. **⏱️ Per-visitor limits.** Each visitor gets 6 AI requests a minute and 40 a day. Past that they see a friendly "please wait" message, and the response includes a `Retry-After` header.
-2. **📊 A shared daily cap.** At most 500 AI requests a day across everyone. That's a hard ceiling on what the demo can spend, whatever happens.
-3. **🚦 A concurrency limit.** At most 3 requests are sent to the AI at once; extra ones are asked to retry in a few seconds.
+2. **📊 A shared daily cap.** At most 500 AI requests a day across everyone. That's a hard ceiling on what the demo can spend, whatever happens. A visitor who is already over their own limit never counts towards it.
+3. **🚦 A concurrency limit.** Each server sends at most 3 requests to the AI at once.
 4. **🌍 An origin check.** Browsers label every request with the site it came from. The server only answers its own site, so other websites can't quietly build on your key.
 
-Only requests that actually reach the AI are counted, and the limits are kept in memory, which suits a single server. If the demo ever gets popular, the next steps would be:
+The counters live in **Upstash Redis** when it's connected, so every copy of the serverless function shares them. Locally, or if Redis can't be reached, they're kept in memory. Possible next steps if the demo gets popular:
 - an invisible bot check such as **Cloudflare Turnstile** in front of the AI features;
-- a shared store such as **Redis** for the counters, so several servers agree on them;
 - **caching** the sample requests, so the guide's demo buttons don't use the quota at all.
 
 ---
@@ -205,14 +217,14 @@ Only requests that actually reach the AI are counted, and the limits are kept in
 ## 🔒 Privacy
 
 - 📷 Camera frames are processed **only in your browser** and are never uploaded.
-- 📸 Screenshots and text you drop or type are sent to **NVIDIA's API** to be read, through your local server. Don't drop anything you wouldn't want to share with a third-party service.
-- 🔑 Your API key stays in `.env` on your machine.
+- 📸 Screenshots and text you drop or type are sent to **NVIDIA's API** to be read, through the server. Don't drop anything you wouldn't want to share with a third-party service.
+- 🔑 Your API key stays in `.env` on your machine, or in Vercel's encrypted environment variables. It never reaches the browser.
 
 ---
 
 ## 🤝 Contributing
 
-Issues and pull requests are welcome. There is no build step: edit a file, refresh the browser, and you'll see the change.
+Issues and pull requests are welcome. There is no build step: edit a file, refresh the browser, and you'll see the change. Run the checks with `python3 -m unittest discover -s tests`.
 
 ---
 

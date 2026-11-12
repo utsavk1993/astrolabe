@@ -1,0 +1,5 @@
+# Not needed on Vercel: the local server, tests and CI config.
+server.py
+tests/
+.github/
+.env

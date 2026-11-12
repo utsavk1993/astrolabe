@@ -1,0 +1,30 @@
+# Runs on every push and pull request: catches a broken JavaScript or Python file, or a
+# failing check of the API logic, before it reaches the live site.
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: JavaScript parses
+        run: for f in *.js; do node --check "$f" || exit 1; echo "ok  $f"; done
+
+      - name: Python compiles
+        run: python -m py_compile server.py api/*.py
+
+      - name: API logic tests
+        run: python -m unittest discover -s tests -v
