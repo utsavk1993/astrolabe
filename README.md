@@ -6,6 +6,8 @@
 
 <p align="center"><b>One dial, eight cities, every time zone at a glance.</b></p>
 
+<p align="center"><a href="https://astrolabe.utsavkumar.com"><b>🌐 Try it live: astrolabe.utsavkumar.com</b></a></p>
+
 <p align="center">
   <img src="assets/demo.gif" alt="Astrolabe demo: the feature guide, reading a dropped meeting invite, stepping between the times found, and finding a meeting slot for New York and London" width="880">
 </p>
