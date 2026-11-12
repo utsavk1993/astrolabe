@@ -226,7 +226,7 @@ The counters live in **Upstash Redis** when it's connected, so every copy of the
 
 ## 🤝 Contributing
 
-Issues and pull requests are welcome. There is no build step: edit a file, refresh the browser, and you'll see the change. Run the checks with `python3 -m unittest discover -s tests`.
+Issues and pull requests are welcome! There is no build step: edit a file, refresh the browser, and you'll see the change. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, where things live, and the checks to run before opening a pull request.
 
 ---
 
